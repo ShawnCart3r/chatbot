@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FAQ Chat Widget</title>
+
+<style>
+/* =====================================================
+   FAQ CHAT WIDGET — v2.0
+   ✏️  CUSTOMIZE: See the FAQ section in the <script>
+   ✏️  COLORS: Edit --accent below to match your brand
+   ===================================================== */
+
+:root {
+  --accent:       #7c4bd2;   /* ← your brand color */
+  --accent-hover: #6a3bc0;
+  --accent-light: rgba(124,75,210,0.1);
+  --bg:           #ffffff;
+  --panel:        #f7f7f9;
+  --text:         #1a1a1a;
+  --text-light:   #666;
+  --text-muted:   #aaa;
+  --border:       rgba(0,0,0,0.08);
+  --shadow:       0 20px 60px rgba(0,0,0,0.18);
+  --radius:       18px;
+  --radius-sm:    12px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Floating bubble ── */
+#chat-bubble {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(124,75,210,0.45);
+  z-index: 9998;
+  border: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#chat-bubble:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 28px rgba(124,75,210,0.55);
+}
+
+#chat-bubble:active { transform: scale(0.95); }
+
+#chat-bubble svg {
+  width: 24px;
+  height: 24px;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+#chat-bubble .icon-close {
+  position: absolute;
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.7);
+}
+
+#chat-bubble.open .icon-chat {
+  opacity: 0;
+  transform: rotate(90deg) scale(0.7);
+}
+
+#chat-bubble.open .icon-close {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+}
+
+/* Unread badge */
+#chat-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 18px;
+  height: 18px;
+  background: #ef4444;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Chat window ── */
+#chat-window {
+  position: fixed;
+  bottom: 92px;
+  right: 24px;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  background: var(--bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: scale(0.92) translateY(16px);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1),
+              opacity 0.2s ease;
+  max-height: calc(100vh - 120px);
+}
+
+#chat-window.open {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* ── Header ── */
+#chat-header {
+  background: var(--accent);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.header-avatar {
+  width: 34px;
+  height: 34px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.header-info { flex: 1; }
+
+.header-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.2;
+}
+
+.header-status {
+  font-size: 11px;
+  color: rgba(255,255,255,0.75);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.header-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4ade80;
+  display: inline-block;
+}
+
+/* ── Messages ── */
+#chat-messages {
+  flex: 1;
+  padding: 16px 14px;
+  overflow-y: auto;
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  scroll-behavior: smooth;
+}
+
+#chat-messages::-webkit-scrollbar { width: 4px; }
+#chat-messages::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.1);
+  border-radius: 2px;
+}
+
+.msg {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  animation: msgIn 0.25s ease forwards;
+}
+
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.msg.user { justify-content: flex-end; }
+.msg.bot  { justify-content: flex-start; }
+
+.bot-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-bottom: 2px;
+}
+
+.bubble {
+  padding: 10px 13px;
+  border-radius: 16px;
+  max-width: 78%;
+  font-size: 13.5px;
+  line-height: 1.45;
+  word-wrap: break-word;
+}
+
+.msg.user .bubble {
+  background: var(--accent);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.msg.bot .bubble {
+  background: #fff;
+  color: var(--text);
+  border-bottom-left-radius: 4px;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+/* ── Typing indicator ── */
+.typing-bubble {
+  display: flex;
+  gap: 4px;
+  padding: 12px 14px;
+  align-items: center;
+}
+
+.typing-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: typingBounce 1.3s infinite ease-in-out;
+}
+
+.typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.typing-dot:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-5px); opacity: 1; }
+}
+
+/* ── Quick chips ── */
+#chat-chips {
+  padding: 10px 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  background: #fff;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+#chat-chips:empty { display: none; }
+
+.chip {
+  padding: 6px 13px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  background: #fff;
+  color: var(--text-light);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.chip:hover {
+  border-color: var(--accent);
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+/* ── Input ── */
+#chat-input-row {
+  display: flex;
+  gap: 8px;
+  padding: 12px 14px;
+  background: #fff;
+  border-top: 1px solid var(--border);
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+#chat-input {
+  flex: 1;
+  padding: 9px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  resize: none;
+  font-size: 13.5px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--panel);
+  min-height: 38px;
+  max-height: 100px;
+  line-height: 1.4;
+  transition: border-color 0.15s ease;
+}
+
+#chat-input:focus {
+  border-color: var(--accent);
+  background: #fff;
+}
+
+#chat-input::placeholder { color: var(--text-muted); }
+
+#chat-send {
+  width: 38px;
+  height: 38px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, transform 0.1s ease;
+  flex-shrink: 0;
+}
+
+#chat-send:hover:not(:disabled) { background: var(--accent-hover); }
+#chat-send:active:not(:disabled) { transform: scale(0.92); }
+#chat-send:disabled { opacity: 0.35; cursor: not-allowed; }
+
+#chat-send svg { width: 16px; height: 16px; }
+
+/* ── Footer ── */
+#chat-footer {
+  padding: 7px 14px;
+  text-align: center;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+#chat-footer span {
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+/* ── Mobile ── */
+@media (max-width: 480px) {
+  #chat-window {
+    bottom: 0;
+    right: 0;
+    left: 0;
+    width: 100%;
+    max-width: 100%;
+    border-radius: var(--radius) var(--radius) 0 0;
+    max-height: 85vh;
+  }
+
+  #chat-bubble {
+    bottom: 20px;
+    right: 20px;
+  }
+
+  #chat-input { font-size: 16px; } /* prevent iOS zoom */
+}
+</style>
+</head>
+<body>
+
+<!-- =====================================================
+     CHAT BUBBLE BUTTON
+     ===================================================== -->
+<button id="chat-bubble" aria-label="Open chat" aria-expanded="false">
+  <!-- Chat icon -->
+  <svg class="icon-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+  </svg>
+  <!-- Close icon -->
+  <svg class="icon-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+    <line x1="18" y1="6" x2="6" y2="18"/>
+    <line x1="6" y1="6" x2="18" y2="18"/>
+  </svg>
+  <span id="chat-badge" aria-hidden="true"></span>
+</button>
+
+<!-- =====================================================
+     CHAT WINDOW
+     ===================================================== -->
+<div id="chat-window" role="dialog" aria-modal="true" aria-label="Chat assistant" hidden>
+
+  <div id="chat-header">
+    <div class="header-avatar">🤖</div>
+    <div class="header-info">
+      <!-- ✏️ CUSTOMIZE: Bot name -->
+      <div class="header-name">Support Bot</div>
+      <div class="header-status">Online — typically replies instantly</div>
+    </div>
+  </div>
+
+  <div id="chat-messages" aria-live="polite"></div>
+
+  <div id="chat-chips"></div>
+
+  <div id="chat-input-row">
+    <textarea
+      id="chat-input"
+      placeholder="Ask a question..."
+      rows="1"
+      maxlength="300"
+      aria-label="Your message"
+    ></textarea>
+    <button id="chat-send" disabled aria-label="Send">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"/>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+    </button>
+  </div>
+
+  <div id="chat-footer">
+    <span>Powered by a single HTML file ✦ No AI, no monthly fees</span>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* =====================================================
+     ✏️  YOUR FAQ — EDIT THIS SECTION
+     
+     Format:  "question keyword(s)": "Your answer here"
+     
+     Tips:
+     - Keys are matched against what the visitor types
+     - Use common phrases your visitors actually ask
+     - Add as many as you like
+     ===================================================== */
+  const FAQ = {
+    "hours":              "We're open Monday through Friday, 9am to 5pm.",
+    "what time":          "We're open Monday through Friday, 9am to 5pm.",
+    "when are you open":  "We're open Monday through Friday, 9am to 5pm.",
+    "book":               "You can book an appointment on our contact page or email us directly.",
+    "appointment":        "You can book an appointment on our contact page or email us directly.",
+    "schedule":           "You can book an appointment on our contact page or email us directly.",
+    "insurance":          "Yes, we accept most major insurance plans. Contact us to verify yours.",
+    "cost":               "Pricing depends on the service. Contact us for a full breakdown.",
+    "price":              "Pricing depends on the service. Contact us for a full breakdown.",
+    "how much":           "Pricing depends on the service. Contact us for a full breakdown.",
+    "location":           "We're located at 123 Main St. We also offer virtual sessions.",
+    "where are you":      "We're located at 123 Main St. We also offer virtual sessions.",
+    "address":            "We're located at 123 Main St. We also offer virtual sessions.",
+    "virtual":            "Yes! We offer online sessions via a secure video platform.",
+    "online":             "Yes! We offer online sessions via a secure video platform.",
+    "contact":            "You can reach us at hello@yoursite.com or (555) 123-4567.",
+    "email":              "Our email is hello@yoursite.com — we reply within one business day.",
+    "phone":              "Our phone number is (555) 123-4567.",
+    "services":           "We offer [Service A], [Service B], and [Service C]. Ask about any of them!",
+    "what do you offer":  "We offer [Service A], [Service B], and [Service C]. Ask about any of them!",
+  };
+
+  /* =====================================================
+     ✏️  QUICK CHIPS — Buttons that appear on open
+     These should match your most common questions.
+     ===================================================== */
+  const CHIPS = [
+    { label: "📅 Hours",       key: "hours" },
+    { label: "💰 Pricing",     key: "price" },
+    { label: "📍 Location",    key: "location" },
+    { label: "📞 Contact",     key: "contact" },
+    { label: "🗓 Book",        key: "book" },
+  ];
+
+  /* =====================================================
+     ✏️  WELCOME MESSAGE
+     ===================================================== */
+  const WELCOME = "Hi there! 👋 I can answer your questions about our hours, pricing, location, and more. What can I help you with?";
+
+  /* =====================================================
+     ✏️  FALLBACK MESSAGE
+     What to say when no FAQ matches
+     ===================================================== */
+  const FALLBACK = (input) => {
+    const closest = findClosest(input);
+    if (closest) {
+      return `I'm not sure about that specifically. Did you mean: <button class="bubble-chip" data-q="${closest.key}">${closest.label}</button>`;
+    }
+    return "I don't have an answer for that yet. Try one of the buttons below, or <a href='mailto:hello@yoursite.com' style='color:var(--accent)'>email us directly</a>.";
+  };
+
+  /* =====================================================
+     CONFIG
+     ===================================================== */
+  const TYPING_DELAY = 550; // ms
+
+  /* =====================================================
+     ENGINE — no need to edit below this line
+     ===================================================== */
+
+  const $ = (id) => document.getElementById(id);
+
+  const els = {
+    bubble:   $('chat-bubble'),
+    badge:    $('chat-badge'),
+    window:   $('chat-window'),
+    messages: $('chat-messages'),
+    chips:    $('chat-chips'),
+    input:    $('chat-input'),
+    send:     $('chat-send'),
+  };
+
+  let isOpen = false;
+  let welcomed = false;
+
+  // ── Toggle ──
+  function toggle() {
+    isOpen ? closeChat() : openChat();
+  }
+
+  function openChat() {
+    isOpen = true;
+    els.window.hidden = false;
+    els.window.classList.add('open');
+    els.bubble.classList.add('open');
+    els.bubble.setAttribute('aria-expanded', 'true');
+    els.badge.style.display = 'none';
+    setTimeout(() => els.input.focus(), 300);
+
+    if (!welcomed) {
+      welcomed = true;
+      addBot(WELCOME);
+      renderChips();
+    }
+  }
+
+  function closeChat() {
+    isOpen = false;
+    els.window.classList.remove('open');
+    els.bubble.classList.remove('open');
+    els.bubble.setAttribute('aria-expanded', 'false');
+    setTimeout(() => { els.window.hidden = true; }, 250);
+  }
+
+  // ── Messages ──
+  function addUser(text) {
+    const msg = document.createElement('div');
+    msg.className = 'msg user';
+    const b = document.createElement('div');
+    b.className = 'bubble';
+    b.textContent = text;
+    msg.appendChild(b);
+    els.messages.appendChild(msg);
+    scroll();
+  }
+
+  function addBot(html, isHTML = false) {
+    // Show typing
+    const typing = document.createElement('div');
+    typing.className = 'msg bot';
+    typing.id = 'typing-indicator';
+    const tb = document.createElement('div');
+    tb.className = 'bubble typing-bubble';
+    tb.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
+    const av = document.createElement('div');
+    av.className = 'bot-avatar';
+    av.textContent = '🤖';
+    typing.appendChild(av);
+    typing.appendChild(tb);
+    els.messages.appendChild(typing);
+    scroll();
+
+    setTimeout(() => {
+      typing.remove();
+
+      const msg = document.createElement('div');
+      msg.className = 'msg bot';
+
+      const av2 = document.createElement('div');
+      av2.className = 'bot-avatar';
+      av2.textContent = '🤖';
+
+      const b = document.createElement('div');
+      b.className = 'bubble';
+
+      if (isHTML) {
+        b.innerHTML = html;
+        // Attach bubble-chip handlers
+        b.querySelectorAll('.bubble-chip').forEach(btn => {
+          btn.style.cssText = 'background:var(--accent-light);border:1.5px solid var(--accent);color:var(--accent);padding:4px 10px;border-radius:999px;font-size:12px;cursor:pointer;margin-top:6px;font-family:inherit;display:inline-block;';
+          btn.addEventListener('click', () => {
+            const key = btn.dataset.q;
+            addUser(btn.textContent);
+            addBot(FAQ[key] || FALLBACK(''));
+            hideChips();
+          });
+        });
+      } else {
+        b.textContent = html;
+      }
+
+      msg.appendChild(av2);
+      msg.appendChild(b);
+      els.messages.appendChild(msg);
+      scroll();
+    }, TYPING_DELAY);
+  }
+
+  // ── Chips ──
+  function renderChips() {
+    els.chips.innerHTML = '';
+    CHIPS.forEach(({ label, key }) => {
+      const btn = document.createElement('button');
+      btn.className = 'chip';
+      btn.textContent = label;
+      btn.addEventListener('click', () => {
+        addUser(label);
+        addBot(FAQ[key] || FALLBACK(key));
+        hideChips();
+      });
+      els.chips.appendChild(btn);
+    });
+  }
+
+  function hideChips() {
+    els.chips.innerHTML = '';
+  }
+
+  // ── Matching ──
+  function normalize(str) {
+    return str.toLowerCase().replace(/[^\w\s]/g, '').trim();
+  }
+
+  function getResponse(text) {
+    const lower = normalize(text);
+
+    // Exact / substring match — longest key wins
+    const keys = Object.keys(FAQ).sort((a, b) => b.length - a.length);
+    for (const key of keys) {
+      if (lower.includes(normalize(key))) return FAQ[key];
+    }
+
+    // Token overlap fallback
+    const tokens = lower.split(/\s+/).filter(Boolean);
+    let bestKey = null, bestScore = 0;
+
+    for (const key of keys) {
+      const keyTokens = normalize(key).split(/\s+/);
+      let score = 0;
+      for (const t of tokens) {
+        if (keyTokens.some(kt => kt.includes(t) || t.includes(kt))) score++;
+      }
+      if (score > bestScore) { bestScore = score; bestKey = key; }
+    }
+
+    if (bestScore >= 1 && bestKey) return FAQ[bestKey];
+
+    return null; // triggers FALLBACK
+  }
+
+  function findClosest(text) {
+    // Returns the closest chip suggestion for "did you mean?"
+    const lower = normalize(text);
+    const tokens = lower.split(/\s+/).filter(t => t.length > 2);
+
+    let best = null, bestScore = 0;
+
+    for (const chip of CHIPS) {
+      const chipTokens = normalize(chip.label.replace(/[^\w\s]/g,'')).split(/\s+/);
+      const faqKey = normalize(chip.key).split(/\s+/);
+      const combined = [...chipTokens, ...faqKey];
+      let score = 0;
+      for (const t of tokens) {
+        if (combined.some(c => c.includes(t) || t.includes(c))) score++;
+      }
+      if (score > bestScore) { bestScore = score; best = chip; }
+    }
+
+    return bestScore > 0 ? best : null;
+  }
+
+  // ── Send ──
+  function send() {
+    const text = els.input.value.trim();
+    if (!text) return;
+
+    addUser(text);
+    els.input.value = '';
+    els.send.disabled = true;
+    autosize();
+    hideChips();
+
+    const response = getResponse(text);
+    if (response) {
+      addBot(response);
+    } else {
+      const fallback = FALLBACK(text);
+      addBot(fallback, true);
+    }
+  }
+
+  // ── Autosize textarea ──
+  function autosize() {
+    els.input.style.height = 'auto';
+    els.input.style.height = Math.min(els.input.scrollHeight, 100) + 'px';
+  }
+
+  function scroll() {
+    requestAnimationFrame(() => {
+      els.messages.scrollTop = els.messages.scrollHeight;
+    });
+  }
+
+  // ── Events ──
+  els.bubble.addEventListener('click', toggle);
+
+  els.send.addEventListener('click', send);
+
+  els.input.addEventListener('input', () => {
+    els.send.disabled = !els.input.value.trim();
+    autosize();
+  });
+
+  els.input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+  });
+
+  // Scroll into view on mobile when keyboard opens
+  els.input.addEventListener('focus', () => {
+    setTimeout(scroll, 300);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && isOpen) closeChat();
+  });
+
+})();
+</script>
+
+</body>
+</html>
